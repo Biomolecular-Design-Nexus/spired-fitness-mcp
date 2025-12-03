@@ -1,0 +1,88 @@
+import os
+import tqdm
+import click
+import torch
+import numpy as np
+import pandas as pd
+from Bio import SeqIO
+from src.model import SPIRED_Stab
+from src.utils_train_valid import getStabDataTest
+
+
+aa_dict = {'A': 'ALA', 'R': 'ARG', 'N': 'ASN', 'D': 'ASP', 'C': 'CYS', 'Q': 'GLN', 'E': 'GLU', 'G': 'GLY', 'H': 'HIS', 'I': 'ILE', 'L': 'LEU', 'K': 'LYS', 'M': 'MET', 'F': 'PHE', 'P': 'PRO', 'S': 'SER', 'T': 'THR', 'W': 'TRP', 'Y': 'TYR', 'V': 'VAL', 'X':'ALA'}
+
+working_directory = os.path.abspath(os.path.dirname(__file__))
+
+@click.command()
+@click.option('--fasta_file', required = True, type = str)
+@click.option('--wt_fasta_file', required = False, type = str, default = None)
+@click.option('--device', required = False, type = str, default = 'cuda:0',)
+def main(fasta_file, wt_fasta_file, device):
+
+    # load wt_seq from wt.fasta file in the fasta dir
+    dir_path = os.path.dirname(fasta_file)
+    wt_fasta_file = os.path.join(dir_path, 'wt.fasta') if wt_fasta_file is None else wt_fasta_file
+    if not os.path.exists(wt_fasta_file):
+        raise FileNotFoundError(f'wt.fasta file not found in {dir_path}. Please provide a valid wt.fasta file.')
+    print(f'Using wt.fasta file: {wt_fasta_file}')
+
+    if not os.path.exists(fasta_file):
+        raise FileNotFoundError(f'Fasta file {fasta_file} not found.')
+    
+    # load parameter
+    model = SPIRED_Stab(device_list = [device, device, device, device])
+    model.load_state_dict(torch.load(f'{working_directory}/data/model/SPIRED-Stab.pth'))
+    model.to(device)
+    model.eval()
+    
+    # load ESM-2 650M model
+    esm2_650M, _ = torch.hub.load('facebookresearch/esm:main', 'esm2_t33_650M_UR50D')
+    esm2_650M.to(device)
+    esm2_650M.eval()
+    
+    # load ESM-2 3B model
+    esm2_3B, esm2_alphabet = torch.hub.load('facebookresearch/esm:main', 'esm2_t36_3B_UR50D')
+    esm2_3B.to(device)
+    esm2_3B.eval()
+    esm2_batch_converter = esm2_alphabet.get_batch_converter()
+    
+    wt_seq = str(list(SeqIO.parse(wt_fasta_file, 'fasta'))[0].seq)
+    
+    # embed wt_seq
+    f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(wt_seq, esm2_3B, esm2_650M, esm2_batch_converter, device=device)
+    wt_data = {
+        'target_tokens': target_tokens,
+        'esm2-3B': f1d_esm2_3B,
+        'embedding': f1d_esm2_650M
+    }
+
+    # load fasta file
+    id_list = []
+    seq_list = []
+    for record in SeqIO.parse(fasta_file, 'fasta'):
+        id_list.append(record.id)
+        seq_list.append(str(record.seq))
+
+    with open(f'{fasta_file}_pred.csv', 'w') as f:
+        f.write('id,seq,ddG,dTm\n')
+
+        # add tqdm to show progress
+        for id, mut_seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
+            
+            mut_pos_torch_list = torch.tensor((np.array(list(wt_seq)) != np.array(list(mut_seq))).astype(int).tolist())
+            
+            # embed mut_seq
+            f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(mut_seq, esm2_3B, esm2_650M, esm2_batch_converter, device=device)
+            mut_data = {
+                    'target_tokens': target_tokens,
+                    'esm2-3B': f1d_esm2_3B,
+                    'embedding': f1d_esm2_650M
+                }
+            
+            with torch.no_grad():
+                ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
+                f.write(f'{id},{mut_seq},{ddG.item()},{dTm.item()}\n')
+        
+
+if __name__ == '__main__':
+    main()

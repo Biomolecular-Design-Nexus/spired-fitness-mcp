@@ -3,7 +3,7 @@
 SPIRED-Fitness MCP server for protein modeling, extracted from the [official SPIRED-Fitness tutorials](https://github.com/Gonglab-THU/SPIRED-Fitness).
 
 ## Overview
-This SPIRED-Fitness MCP server provides three protein analysis tools using ProtTrans models. Here we have 3 main scripts for protein analysis. But due to the large memory requirements, we only use Spired-Stab in the mcp service.
+This SPIRED-Fitness MCP server provides three protein analysis tools. Here we only use Spired-Stab in the mcp service for stability prediction.
 
 ## Installation
 
@@ -19,19 +19,9 @@ pip install --ignore-installed fastmcp
 Download the [model parameters](https://zenodo.org/records/10675405) and move it into the `data/model` folder.
 
 ## Local usage
-### 1. Structure prediction
+### 1. Stability prediction
 ```shell
-python scripts/run_spired.py --fasta examples/test.fasta --output examples/spired --repo repo/SPIRED-Fitness
-```
-
-### 2. Fitness prediction
-```shell
-python scripts/run_spired_fitness.py --fasta examples/test.fasta --output examples/spired --repo repo/SPIRED-Fitness
-```
-
-### 3. Stability prediction
-```shell
-python scripts/run_spired_stab.py --fasta examples/test.fasta --output examples/spired --repo repo/SPIRED-Fitness
+python scripts/run_SPIRED-Stab.py --fasta_file examples/sequences.fasta --wt_fasta_file examples/wt.fasta --device cuda:1
 ```
 
 ## MCP usage
@@ -42,13 +32,10 @@ fastmcp install gemini-cli mcp-servers/spired_fitness_mcp/src/spired_fitness_mcp
 ```
 
 ### Call MCP service
-Test wt path
-/home/xux/Desktop/ProteinMCP/ProteinMCP/examples/case2.1_subtilisin/wt.fasta
-
-Test fasta path
-/home/xux/Desktop/ProteinMCP/ProteinMCP/mcp-servers/spired-fitness_mcp/examples/test.fasta
-Test csv path
-/home/xux/Desktop/ProteinMCP/ProteinMCP/examples/case2.1_subtilisin/data.csv
+Test data paths
+- /home/xux/Desktop/ProteinMCP/ProteinMCP/mcp-servers/spired-fitness_mcp/examples/sequences.fasta
+- /home/xux/Desktop/ProteinMCP/ProteinMCP/mcp-servers/spired-fitness_mcp/examples/data.csv
+- /home/xux/Desktop/ProteinMCP/ProteinMCP/examples/case2.1_subtilisin/data.csv
 
 #### Stability prediction
 ```markdown
