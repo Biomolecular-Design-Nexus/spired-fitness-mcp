@@ -16,7 +16,7 @@ pip install click einops pandas biopython tqdm loguru sniffio
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install --ignore-installed fastmcp
 ```
-Download the [model parameters](https://zenodo.org/records/10675405) and move it into the `data/model` folder.
+Download the [model parameters](https://zenodo.org/records/10675405) and move it into the `scripts/data/model` folder.
 
 ## Local usage
 ### 1. Stability prediction
